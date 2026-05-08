@@ -189,7 +189,7 @@ func buildWeightArtifactsFromPlans(ctx context.Context, builder *model.WeightBui
 func printImportPlan(plans []*model.WeightImportPlan, verbose bool) {
 	for _, p := range plans {
 		statusIcon := planStatusIcon(p.Status)
-		console.Infof("%s %s  %s → %s", statusIcon, p.Spec.Name(), p.Spec.URI, p.Spec.Target)
+		printSourceHeader(statusIcon, p.Spec.Name(), p.Spec.Target, p.Spec.Sources)
 		console.Infof("  status: %s", p.Status)
 
 		if len(p.Changes) > 0 {
@@ -355,6 +355,25 @@ func pushWeightArtifacts(ctx context.Context, repo string, artifacts []*model.We
 	console.Infof("Total: %s", formatSize(totalSize))
 
 	return nil
+}
+
+// printSourceHeader prints the weight name + source(s) + target as a
+// header line for plan/status output. Single-source weights render on
+// one line ("name  uri → target"); multi-source weights expand sources
+// onto their own lines so URIs can't run together visually:
+//
+//	~ name  → /target
+//	  source[0]: hf://acme/base
+//	  source[1]: https://github.com/acme/release/v1.0/extras.bin
+func printSourceHeader(statusIcon, name, target string, sources []model.SourceSpec) {
+	if len(sources) == 1 {
+		console.Infof("%s %s  %s → %s", statusIcon, name, sources[0].URI, target)
+		return
+	}
+	console.Infof("%s %s  → %s", statusIcon, name, target)
+	for i, s := range sources {
+		console.Infof("  source[%d]: %s", i, s.URI)
+	}
 }
 
 func formatSize(bytes int64) string {

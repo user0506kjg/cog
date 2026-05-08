@@ -164,7 +164,7 @@ func statusResultsToEntries(results []model.WeightStatusResult) []WeightStatusEn
 			entries[i].LayerCount = len(le.Layers)
 			entries[i].FileCount = len(le.Files)
 			entries[i].Digest = le.Digest
-			entries[i].Source = lockSourceToStatus(le.Source)
+			entries[i].Source = lockSourcesToStatus(le.Sources)
 		}
 		for _, l := range r.Layers {
 			entries[i].Layers = append(entries[i].Layers, LayerStatusEntry{
@@ -177,13 +177,24 @@ func statusResultsToEntries(results []model.WeightStatusResult) []WeightStatusEn
 	return entries
 }
 
-func lockSourceToStatus(s lockfile.WeightLockSource) *WeightStatusSource {
+func lockSourcesToStatus(sources []lockfile.WeightLockSource) *WeightStatusSource {
+	if len(sources) == 0 {
+		return nil
+	}
+	// For display, show the first source's URI and fingerprint, with
+	// a "(+N more)" indicator for multi-source weights so the
+	// truncation is visible. Full details are in the lockfile.
+	s := sources[0]
 	fp := string(s.Fingerprint)
 	if s.URI == "" && fp == "" {
 		return nil
 	}
+	uri := s.URI
+	if len(sources) > 1 {
+		uri = fmt.Sprintf("%s (+%d more)", s.URI, len(sources)-1)
+	}
 	return &WeightStatusSource{
-		URI:         s.URI,
+		URI:         uri,
 		Fingerprint: fp,
 	}
 }

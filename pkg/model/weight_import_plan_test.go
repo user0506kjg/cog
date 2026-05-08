@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func TestPlanImport_NewWeight(t *testing.T) {
 
 	src := NewSourceFromConfig(&config.Config{
 		Weights: []config.WeightSource{
-			{Name: "my-model", Target: "/src/weights", Source: &config.WeightSourceConfig{URI: "weights"}},
+			{Name: "my-model", Target: "/src/weights", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights"}}}},
 		},
 	}, projectDir)
 
@@ -46,7 +47,7 @@ func TestPlanImport_Unchanged(t *testing.T) {
 	})
 
 	weights := []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "weights"}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights"}}}},
 	}
 	src := NewSourceFromConfig(&config.Config{Weights: weights}, projectDir)
 
@@ -73,7 +74,7 @@ func TestPlanImport_ConfigChanged(t *testing.T) {
 	})
 
 	weights := []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "weights"}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights"}}}},
 	}
 
 	wb, _ := newTestBuilder(t, projectDir, weights)
@@ -84,7 +85,7 @@ func TestPlanImport_ConfigChanged(t *testing.T) {
 	specWithExclude, err := WeightSpecFromConfig(config.WeightSource{
 		Name:   "w",
 		Target: "/src/w",
-		Source: &config.WeightSourceConfig{URI: "weights", Exclude: []string{"*.onnx"}},
+		Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights", Exclude: []string{"*.onnx"}}}},
 	})
 	require.NoError(t, err)
 
@@ -116,13 +117,13 @@ func TestPlanImport_WithFilter_ShowsExcluded(t *testing.T) {
 	spec, err := WeightSpecFromConfig(config.WeightSource{
 		Name:   "w",
 		Target: "/src/w",
-		Source: &config.WeightSourceConfig{URI: "weights", Exclude: []string{"*.onnx"}},
+		Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights", Exclude: []string{"*.onnx"}}}},
 	})
 	require.NoError(t, err)
 
 	src := NewSourceFromConfig(&config.Config{
 		Weights: []config.WeightSource{
-			{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "weights", Exclude: []string{"*.onnx"}}},
+			{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights", Exclude: []string{"*.onnx"}}}}},
 		},
 	}, projectDir)
 
@@ -147,7 +148,7 @@ func TestPlanImport_UpstreamChanged(t *testing.T) {
 	})
 
 	weights := []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "weights"}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights"}}}},
 	}
 
 	wb, _ := newTestBuilder(t, projectDir, weights)
@@ -180,29 +181,29 @@ func TestDescribeSpecDrift(t *testing.T) {
 	}{
 		{
 			name:    "URI changed",
-			config:  &WeightSpec{URI: "hf://org/new", Target: "/src/w"},
-			lock:    &WeightSpec{URI: "hf://org/old", Target: "/src/w"},
+			config:  &WeightSpec{Target: "/src/w", Sources: []SourceSpec{{URI: "hf://org/new"}}},
+			lock:    &WeightSpec{Target: "/src/w", Sources: []SourceSpec{{URI: "hf://org/old"}}},
 			wantLen: 1,
 			wantSub: "uri",
 		},
 		{
 			name:    "target changed",
-			config:  &WeightSpec{URI: "hf://org/m", Target: "/src/new"},
-			lock:    &WeightSpec{URI: "hf://org/m", Target: "/src/old"},
+			config:  &WeightSpec{Target: "/src/new", Sources: []SourceSpec{{URI: "hf://org/m"}}},
+			lock:    &WeightSpec{Target: "/src/old", Sources: []SourceSpec{{URI: "hf://org/m"}}},
 			wantLen: 1,
 			wantSub: "target",
 		},
 		{
 			name:    "include changed",
-			config:  &WeightSpec{URI: "hf://org/m", Target: "/src/w", Include: []string{"*.json"}},
-			lock:    &WeightSpec{URI: "hf://org/m", Target: "/src/w"},
+			config:  &WeightSpec{Target: "/src/w", Sources: []SourceSpec{{URI: "hf://org/m", Include: []string{"*.json"}}}},
+			lock:    &WeightSpec{Target: "/src/w", Sources: []SourceSpec{{URI: "hf://org/m"}}},
 			wantLen: 1,
 			wantSub: "include",
 		},
 		{
 			name:    "multiple changes",
-			config:  &WeightSpec{URI: "new-uri", Target: "/new", Exclude: []string{"*.bin"}},
-			lock:    &WeightSpec{URI: "old-uri", Target: "/old"},
+			config:  &WeightSpec{Target: "/new", Sources: []SourceSpec{{URI: "new-uri", Exclude: []string{"*.bin"}}}},
+			lock:    &WeightSpec{Target: "/old", Sources: []SourceSpec{{URI: "old-uri"}}},
 			wantLen: 3,
 		},
 	}
@@ -227,9 +228,9 @@ func TestBuildFromPlan_MatchesBuild(t *testing.T) {
 	})
 
 	weights := []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{
 			URI: "weights", Exclude: []string{"*.onnx"},
-		}},
+		}}}},
 	}
 
 	spec, err := WeightSpecFromConfig(weights[0])
@@ -268,7 +269,7 @@ func TestPlanImport_NoLockfile(t *testing.T) {
 
 	src := NewSourceFromConfig(&config.Config{
 		Weights: []config.WeightSource{
-			{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "weights"}},
+			{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights"}}}},
 		},
 	}, projectDir)
 
@@ -278,4 +279,46 @@ func TestPlanImport_NoLockfile(t *testing.T) {
 	plan, err := planner.PlanImport(context.Background(), spec)
 	require.NoError(t, err)
 	assert.Equal(t, PlanStatusNew, plan.Status)
+}
+
+// TestPlanImport_DescribesPerSourceDrift verifies that drift caused by
+// mutating one source surfaces in plan.Changes against that specific
+// source index, not as an opaque combined-fingerprint diff.
+func TestPlanImport_DescribesPerSourceDrift(t *testing.T) {
+	projectDir := t.TempDir()
+	makeWeightDir(t, projectDir, "src-a", map[string][]byte{"a.json": []byte(`{"v":1}`)})
+	makeWeightDir(t, projectDir, "src-b", map[string][]byte{"b.json": []byte(`{"v":1}`)})
+
+	weights := []config.WeightSource{{
+		Name:   "w",
+		Target: "/src/w",
+		Source: config.WeightSourceList{Items: []config.WeightSourceConfig{
+			{URI: "src-a"}, {URI: "src-b"},
+		}},
+	}}
+	wb, _ := newTestBuilder(t, projectDir, weights)
+	spec, err := WeightSpecFromConfig(weights[0])
+	require.NoError(t, err)
+
+	_, err = wb.Build(context.Background(), spec)
+	require.NoError(t, err)
+
+	makeWeightDir(t, projectDir, "src-b", map[string][]byte{"b.json": []byte(`{"v":2}`)})
+
+	plan, err := wb.PlanImport(context.Background(), spec)
+	require.NoError(t, err)
+	assert.Equal(t, PlanStatusUpstreamChanged, plan.Status)
+	require.NotEmpty(t, plan.Changes)
+
+	var b1Mentioned, a0Mentioned bool
+	for _, c := range plan.Changes {
+		if strings.Contains(c, "source[1]") {
+			b1Mentioned = true
+		}
+		if strings.Contains(c, "source[0]") {
+			a0Mentioned = true
+		}
+	}
+	assert.True(t, b1Mentioned, "drift must name source[1]: got %v", plan.Changes)
+	assert.False(t, a0Mentioned, "drift must not name source[0] (unchanged): got %v", plan.Changes)
 }

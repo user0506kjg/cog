@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,7 +47,7 @@ func testWeightSpec(t *testing.T, name, uri, target string) *WeightSpec {
 	spec, err := WeightSpecFromConfig(config.WeightSource{
 		Name:   name,
 		Target: target,
-		Source: &config.WeightSourceConfig{URI: uri},
+		Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: uri}}},
 	})
 	require.NoError(t, err)
 	return spec
@@ -60,7 +61,7 @@ func TestWeightBuilder_HappyPath(t *testing.T) {
 	})
 
 	wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "my-model", Target: "/src/weights/my-model", Source: &config.WeightSourceConfig{URI: "weights/my-model"}},
+		{Name: "my-model", Target: "/src/weights/my-model", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights/my-model"}}}},
 	})
 
 	spec := testWeightSpec(t, "my-model", "weights/my-model", "/src/weights/my-model")
@@ -102,7 +103,7 @@ func TestWeightBuilder_PopulatesStore(t *testing.T) {
 	})
 
 	wb, st := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "w"}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w"}}}},
 	})
 
 	spec := testWeightSpec(t, "w", "w", "/src/w")
@@ -131,7 +132,7 @@ func TestWeightBuilder_FastPath_PopulatesEmptyStore(t *testing.T) {
 
 	// First, do a normal build to write the lockfile.
 	wb1, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "w"}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w"}}}},
 	})
 	spec := testWeightSpec(t, "w", "w", "/src/w")
 	_, err := wb1.Build(context.Background(), spec)
@@ -141,7 +142,7 @@ func TestWeightBuilder_FastPath_PopulatesEmptyStore(t *testing.T) {
 	// (empty) store. This is the "fresh clone" scenario.
 	src := NewSourceFromConfig(&config.Config{
 		Weights: []config.WeightSource{
-			{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "w"}},
+			{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w"}}}},
 		},
 	}, projectDir)
 	freshStore, err := store.NewFileStore(t.TempDir())
@@ -169,7 +170,7 @@ func TestWeightBuilder_StampsEnvelopeFormat(t *testing.T) {
 	makeWeightDir(t, projectDir, "w", map[string][]byte{"a.json": []byte(`{"x":1}`)})
 
 	wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "w"}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w"}}}},
 	})
 
 	spec := testWeightSpec(t, "w", "w", "/src/w")
@@ -196,7 +197,7 @@ func TestWeightBuilder_EnvelopeFormatMismatch_TriggersRecompute(t *testing.T) {
 	makeWeightDir(t, projectDir, "w", map[string][]byte{"a.json": []byte(`{"x":1}`)})
 
 	wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "w"}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w"}}}},
 	})
 	spec := testWeightSpec(t, "w", "w", "/src/w")
 	_, err := wb.Build(context.Background(), spec)
@@ -234,7 +235,7 @@ func TestWeightBuilder_FastPath_NoOpRebuild(t *testing.T) {
 	makeWeightDir(t, projectDir, "w", map[string][]byte{"a.json": []byte(`{"x":1}`)})
 
 	wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "w"}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w"}}}},
 	})
 	spec := testWeightSpec(t, "w", "w", "/src/w")
 	first, err := wb.Build(context.Background(), spec)
@@ -266,7 +267,7 @@ func TestWeightBuilder_WritesLockfile(t *testing.T) {
 	})
 
 	wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "mw", Target: "/src/weights/mw", Source: &config.WeightSourceConfig{URI: "weights/mw"}},
+		{Name: "mw", Target: "/src/weights/mw", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "weights/mw"}}}},
 	})
 
 	spec := testWeightSpec(t, "mw", "weights/mw", "/src/weights/mw")
@@ -290,15 +291,16 @@ func TestWeightBuilder_WritesLockfile(t *testing.T) {
 
 	// Source block is populated with the normalized URI, a sha256
 	// fingerprint, and empty include/exclude patterns.
-	require.Equal(t, "file://./weights/mw", entry.Source.URI)
-	require.Equal(t, "sha256", entry.Source.Fingerprint.Scheme())
-	require.Equal(t, wa.Entry.SetDigest, entry.Source.Fingerprint.String(),
+	require.Len(t, entry.Sources, 1)
+	require.Equal(t, "file://./weights/mw", entry.Sources[0].URI)
+	require.Equal(t, "sha256", entry.Sources[0].Fingerprint.Scheme())
+	require.Equal(t, wa.Entry.SetDigest, entry.Sources[0].Fingerprint.String(),
 		"file:// fingerprint is the set digest")
-	require.NotNil(t, entry.Source.Include)
-	require.NotNil(t, entry.Source.Exclude)
-	require.Empty(t, entry.Source.Include)
-	require.Empty(t, entry.Source.Exclude)
-	require.False(t, entry.Source.ImportedAt.IsZero())
+	require.NotNil(t, entry.Sources[0].Include)
+	require.NotNil(t, entry.Sources[0].Exclude)
+	require.Empty(t, entry.Sources[0].Include)
+	require.Empty(t, entry.Sources[0].Exclude)
+	require.False(t, entry.ImportedAt.IsZero())
 
 	// File index is populated and sorted by path.
 	require.Len(t, entry.Files, 2)
@@ -338,8 +340,8 @@ func TestWeightBuilder_UpdatesExistingLockfile(t *testing.T) {
 	makeWeightDir(t, projectDir, "w2", map[string][]byte{"b.json": []byte(`{"w":2}`)})
 
 	wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "w1", Target: "/src/w1", Source: &config.WeightSourceConfig{URI: "w1"}},
-		{Name: "w2", Target: "/src/w2", Source: &config.WeightSourceConfig{URI: "w2"}},
+		{Name: "w1", Target: "/src/w1", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w1"}}}},
+		{Name: "w2", Target: "/src/w2", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w2"}}}},
 	})
 
 	_, err := wb.Build(context.Background(), testWeightSpec(t, "w1", "w1", "/src/w1"))
@@ -371,7 +373,7 @@ func TestWeightBuilder_FastPath_UpdatesConfigFields(t *testing.T) {
 	newTarget := "/src/w-moved"
 
 	wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "w", Target: oldTarget, Source: &config.WeightSourceConfig{URI: "w"}},
+		{Name: "w", Target: oldTarget, Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w"}}}},
 	})
 
 	// First build writes the lockfile with the old target.
@@ -384,7 +386,7 @@ func TestWeightBuilder_FastPath_UpdatesConfigFields(t *testing.T) {
 	lock, err := lockfile.LoadWeightsLock(lockPath)
 	require.NoError(t, err)
 	require.Equal(t, oldTarget, lock.Weights[0].Target)
-	require.Equal(t, "file://./w", lock.Weights[0].Source.URI)
+	require.Equal(t, "file://./w", lock.Weights[0].Sources[0].URI)
 
 	// Second build: same name, same source dir, different target.
 	// Layers should be reused (fast path) but the target must be
@@ -404,7 +406,7 @@ func TestWeightBuilder_FastPath_UpdatesConfigFields(t *testing.T) {
 	require.Equal(t, newTarget, lock2.Weights[0].Target,
 		"fast-path rebuild must update the target in the lockfile")
 
-	require.Equal(t, "file://./w", lock2.Weights[0].Source.URI,
+	require.Equal(t, "file://./w", lock2.Weights[0].Sources[0].URI,
 		"normalized source URI must be preserved")
 	require.Equal(t, newTarget, sa.Entry.Target)
 }
@@ -415,7 +417,7 @@ func TestWeightBuilder_CacheMiss_ContentsChanged(t *testing.T) {
 	makeWeightDir(t, projectDir, weightDir, map[string][]byte{"a.json": []byte(`{"x":1}`)})
 
 	wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: weightDir}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: weightDir}}}},
 	})
 
 	spec := testWeightSpec(t, "w", weightDir, "/src/w")
@@ -505,7 +507,7 @@ func TestWeightBuilder_IdenticalContentDifferentPaths(t *testing.T) {
 	})
 
 	wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-		{Name: "w", Target: "/src/w", Source: &config.WeightSourceConfig{URI: "w"}},
+		{Name: "w", Target: "/src/w", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: "w"}}}},
 	})
 
 	spec := testWeightSpec(t, "w", "w", "/src/w")
@@ -549,7 +551,7 @@ func TestWeightBuilder_NormalizesSourceURI(t *testing.T) {
 			makeWeightDir(t, projectDir, "weights/mw", map[string][]byte{"c.json": []byte(`{}`)})
 
 			wb, _ := newTestBuilder(t, projectDir, []config.WeightSource{
-				{Name: "mw", Target: "/src/weights/mw", Source: &config.WeightSourceConfig{URI: tc.rawURI}},
+				{Name: "mw", Target: "/src/weights/mw", Source: config.WeightSourceList{Items: []config.WeightSourceConfig{{URI: tc.rawURI}}}},
 			})
 			spec := testWeightSpec(t, "mw", tc.rawURI, "/src/weights/mw")
 			_, err := wb.Build(context.Background(), spec)
@@ -558,7 +560,133 @@ func TestWeightBuilder_NormalizesSourceURI(t *testing.T) {
 			lock, err := lockfile.LoadWeightsLock(filepath.Join(projectDir, "weights.lock"))
 			require.NoError(t, err)
 			require.Len(t, lock.Weights, 1)
-			require.Equal(t, tc.wantURI, lock.Weights[0].Source.URI)
+			require.Equal(t, tc.wantURI, lock.Weights[0].Sources[0].URI)
 		})
 	}
+}
+
+// TestWeightBuilder_MultiSourceMerge covers two-source resolution:
+// disjoint files merge into one inventory; overlapping paths resolve
+// last-in-wins (declaration order = layering order). Both scenarios
+// share the same setup shape, so they table-drive cleanly.
+//
+// In every case Sources[] preserves declaration order with distinct
+// per-source fingerprints; the per-case expectations focus on the
+// merged-file index and the bytes the store ends up holding.
+func TestWeightBuilder_MultiSourceMerge(t *testing.T) {
+	bytesA := []byte(`{"version": "from-a"}`)
+	bytesB := []byte(`{"version": "from-b"}`)
+
+	tests := []struct {
+		name       string
+		aFiles     map[string][]byte
+		bFiles     map[string][]byte
+		wantPaths  []string
+		wantWinner map[string][]byte // path → bytes that should land in the store
+	}{
+		{
+			name:       "disjoint files merge into both",
+			aFiles:     map[string][]byte{"config.json": []byte(`{"hidden_size": 768}`)},
+			bFiles:     map[string][]byte{"tokenizer.json": []byte(`{"vocab_size": 50257}`)},
+			wantPaths:  []string{"config.json", "tokenizer.json"},
+			wantWinner: nil, // no overlap; skip byte check
+		},
+		{
+			name:       "overlapping path: last source wins",
+			aFiles:     map[string][]byte{"config.json": bytesA},
+			bFiles:     map[string][]byte{"config.json": bytesB},
+			wantPaths:  []string{"config.json"},
+			wantWinner: map[string][]byte{"config.json": bytesB},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			projectDir := t.TempDir()
+			makeWeightDir(t, projectDir, "src-a", tc.aFiles)
+			makeWeightDir(t, projectDir, "src-b", tc.bFiles)
+
+			weights := []config.WeightSource{{
+				Name:   "w",
+				Target: "/src/w",
+				Source: config.WeightSourceList{Items: []config.WeightSourceConfig{
+					{URI: "src-a"}, {URI: "src-b"},
+				}},
+			}}
+			wb, st := newTestBuilder(t, projectDir, weights)
+			spec, err := WeightSpecFromConfig(weights[0])
+			require.NoError(t, err)
+
+			artifact, err := wb.Build(context.Background(), spec)
+			require.NoError(t, err)
+			wa := artifact.(*WeightArtifact)
+
+			gotPaths := make([]string, len(wa.Entry.Files))
+			for i, f := range wa.Entry.Files {
+				gotPaths[i] = f.Path
+			}
+			assert.Equal(t, tc.wantPaths, gotPaths, "merged file index")
+
+			require.Len(t, wa.Entry.Sources, 2)
+			assert.Equal(t, "file://./src-a", wa.Entry.Sources[0].URI)
+			assert.Equal(t, "file://./src-b", wa.Entry.Sources[1].URI)
+			assert.NotEqual(t, wa.Entry.Sources[0].Fingerprint, wa.Entry.Sources[1].Fingerprint,
+				"distinct sources must hash differently")
+
+			for path, want := range tc.wantWinner {
+				idx := slices.IndexFunc(wa.Entry.Files, func(f lockfile.WeightLockFile) bool {
+					return f.Path == path
+				})
+				require.GreaterOrEqual(t, idx, 0, "expected file %s in entry", path)
+				storePath, err := st.Path(context.Background(), wa.Entry.Files[idx].Digest)
+				require.NoError(t, err)
+				got, err := os.ReadFile(storePath) //nolint:gosec // G304: storePath is from the test's own FileStore
+				require.NoError(t, err)
+				assert.Equal(t, want, got, "store bytes for %s", path)
+			}
+		})
+	}
+}
+
+// TestWeightBuilder_FingerprintDriftPerSource verifies that mutating
+// one source's contents updates only that source's fingerprint,
+// leaving the other stable.
+func TestWeightBuilder_FingerprintDriftPerSource(t *testing.T) {
+	projectDir := t.TempDir()
+	makeWeightDir(t, projectDir, "src-a", map[string][]byte{"a.json": []byte(`{"v":1}`)})
+	makeWeightDir(t, projectDir, "src-b", map[string][]byte{"b.json": []byte(`{"v":1}`)})
+
+	weights := []config.WeightSource{{
+		Name:   "w",
+		Target: "/src/w",
+		Source: config.WeightSourceList{Items: []config.WeightSourceConfig{
+			{URI: "src-a"}, {URI: "src-b"},
+		}},
+	}}
+	wb, _ := newTestBuilder(t, projectDir, weights)
+	spec, err := WeightSpecFromConfig(weights[0])
+	require.NoError(t, err)
+
+	_, err = wb.Build(context.Background(), spec)
+	require.NoError(t, err)
+
+	lockPath := filepath.Join(projectDir, "weights.lock")
+	lock1, err := lockfile.LoadWeightsLock(lockPath)
+	require.NoError(t, err)
+	require.Len(t, lock1.Weights[0].Sources, 2)
+	fpA1 := lock1.Weights[0].Sources[0].Fingerprint
+	fpB1 := lock1.Weights[0].Sources[1].Fingerprint
+
+	makeWeightDir(t, projectDir, "src-b", map[string][]byte{"b.json": []byte(`{"v":2}`)})
+
+	_, err = wb.Build(context.Background(), spec)
+	require.NoError(t, err)
+
+	lock2, err := lockfile.LoadWeightsLock(lockPath)
+	require.NoError(t, err)
+	require.Len(t, lock2.Weights[0].Sources, 2)
+	assert.Equal(t, fpA1, lock2.Weights[0].Sources[0].Fingerprint,
+		"untouched source's fingerprint must stay stable")
+	assert.NotEqual(t, fpB1, lock2.Weights[0].Sources[1].Fingerprint,
+		"mutated source's fingerprint must change")
 }
