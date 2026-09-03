@@ -15,7 +15,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/hashicorp/go-version v1.9.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/mattn/go-isatty v0.0.21
+	github.com/mattn/go-isatty v0.0.24
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/buildkit v0.29.0
 	github.com/moby/docker-image-spec v1.3.1
