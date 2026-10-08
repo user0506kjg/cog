@@ -136,7 +136,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Build SDK
@@ -188,7 +188,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Get version from VERSION.txt
@@ -219,7 +219,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Check Go formatting
@@ -231,7 +231,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Ensure Rust components
@@ -245,7 +245,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Check Python formatting
@@ -257,7 +257,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Check llms.txt is up to date
@@ -281,7 +281,7 @@ jobs:
         with:
           workspaces: crates -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Check stubs are up to date
@@ -300,7 +300,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Lint Go
@@ -316,7 +316,7 @@ jobs:
         with:
           workspaces: crates -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Ensure Rust components
@@ -330,7 +330,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Check licenses, bans, and sources
@@ -347,7 +347,7 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Check advisories (informational)
@@ -371,7 +371,7 @@ jobs:
           path: dist
       - name: Extract source distribution
         run: tar xf dist/*.tar.gz --strip-components=1
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Ensure nox is installed
@@ -385,7 +385,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Lint Markdown
@@ -405,7 +405,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Test Go
@@ -431,7 +431,7 @@ jobs:
       CGO_ENABLED: "1"
     steps:
       - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Fuzz schema type resolution
@@ -453,7 +453,7 @@ jobs:
         with:
           workspaces: crates -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Test Rust
@@ -476,7 +476,7 @@ jobs:
           merge-multiple: true
       - name: Extract source distribution
         run: tar xf dist/*.tar.gz --strip-components=1
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Remove src to ensure tests run against wheel
@@ -506,7 +506,7 @@ jobs:
         with:
           workspaces: crates -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Test coglet-python bindings
@@ -626,7 +626,7 @@ jobs:
         run: |
           cp dist/cog ./cog
           chmod +x ./cog
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Set wheel environment
@@ -786,7 +786,7 @@ jobs:
         with:
           workspaces: crates -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v5
         with:
           cache_key_prefix: mise-ci-${{ github.job }}
       - name: Check coglet crates.io publish
